@@ -1,0 +1,12 @@
+src/
+tests/
+cmd/
+*.go
+go.mod
+go.sum
+dj
+coverage.out
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.DS_Store
