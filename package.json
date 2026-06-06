@@ -41,5 +41,13 @@
     "git"
   ],
   "author": "DiamondJdev",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DiamondJdev/djCLI.git"
+  },
+  "homepage": "https://github.com/DiamondJdev/djCLI#readme",
+  "bugs": {
+    "url": "https://github.com/DiamondJdev/djCLI/issues"
+  }
 }
