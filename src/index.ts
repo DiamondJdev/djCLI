@@ -7,7 +7,7 @@ import { initCommand } from './commands/init.js'
 const program = new Command()
   .name('dj')
   .description("dj, the opinionated CLI wrapper")
-  .version('0.1.0', '-v, --version', 'output the current version')
+  .version('1.1.2', '-v, --version', 'output the current version')
 
 program.addCommand(delBranchesCommand)
 program.addCommand(cleanCommand)
