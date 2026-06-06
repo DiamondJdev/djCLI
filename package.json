@@ -1,10 +1,10 @@
 {
-  "name": "dj-cli",
-  "version": "0.1.0",
+  "name": "djmond",
+  "version": "1.1.0",
   "description": "DiamondJdev's opinionated CLI wrapper",
   "type": "module",
   "bin": {
-    "dj": "./dist/index.js"
+    "dj": "dist/index.js"
   },
   "scripts": {
     "build": "tsup",
@@ -44,7 +44,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DiamondJdev/djCLI.git"
+    "url": "git+https://github.com/DiamondJdev/djCLI.git"
   },
   "homepage": "https://github.com/DiamondJdev/djCLI#readme",
   "bugs": {
