@@ -3,6 +3,7 @@ import { delBranchesCommand } from "./commands/del-branches.js";
 import { cleanCommand } from "./commands/clean.js";
 import { runCommand } from "./commands/run.js";
 import { initCommand } from "./commands/init.js";
+import { skillCommand } from "./commands/skill.js";
 import { printAsciiArt } from "./utils/ascii.js";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -28,6 +29,7 @@ program.addCommand(delBranchesCommand);
 program.addCommand(cleanCommand);
 program.addCommand(runCommand);
 program.addCommand(initCommand);
+program.addCommand(skillCommand);
 
 // If no command was provided, add delay before showing help
 if (hasNoArgs) {
