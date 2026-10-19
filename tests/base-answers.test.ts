@@ -1,5 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
+vi.mock("child_process", () => ({
+  execFileSync: vi.fn(() => "Me\n"),
+}));
+
 vi.mock("@inquirer/prompts", () => ({
   input: vi.fn(),
   select: vi.fn(),
@@ -7,11 +11,8 @@ vi.mock("@inquirer/prompts", () => ({
 }));
 
 import { input, select, confirm } from "@inquirer/prompts";
-import {
-  toPackageName,
-  isValidPackageName,
-  resolveBaseAnswers,
-} from "../src/commands/base/answers.js";
+import { toPackageName, isValidPackageName } from "../src/commands/init/answers.js";
+import { resolveBaseAnswers } from "../src/commands/base/answers.js";
 
 beforeEach(() => {
   vi.mocked(input).mockReset();
@@ -51,8 +52,7 @@ describe("resolveBaseAnswers", () => {
   it("--yes with all flags never prompts", async () => {
     const a = await resolveBaseAnswers(
       "./x",
-      { yes: true, name: "x", description: "d", pm: "uv", docker: true, git: false },
-      "Me",
+      { yes: true, name: "x", description: "d", pm: "uv", docker: true, git: false }
     );
     expect(a).toEqual({
       name: "x",
@@ -70,8 +70,7 @@ describe("resolveBaseAnswers", () => {
   it("--yes fills defaults from the folder name", async () => {
     const a = await resolveBaseAnswers(
       "/tmp/My App",
-      { yes: true, description: "d" },
-      "Me",
+      { yes: true, description: "d" }
     );
     expect(a).toMatchObject({
       name: "my-app",
@@ -83,26 +82,26 @@ describe("resolveBaseAnswers", () => {
 
   it("--yes without --description throws", async () => {
     await expect(
-      resolveBaseAnswers("./x", { yes: true }, "Me"),
+      resolveBaseAnswers("./x", { yes: true }),
     ).rejects.toThrow("Missing --description (required with --yes)");
   });
 
   it("rejects --pm yarn", async () => {
     await expect(
-      resolveBaseAnswers("./x", { yes: true, description: "d", pm: "yarn" }, "Me"),
+      resolveBaseAnswers("./x", { yes: true, description: "d", pm: "yarn" }),
     ).rejects.toThrow("Invalid --pm 'yarn'. Use one of: npm, pnpm, uv");
   });
 
   it("rejects an invalid --name", async () => {
     await expect(
-      resolveBaseAnswers("./x", { yes: true, description: "d", name: "My App" }, "Me"),
+      resolveBaseAnswers("./x", { yes: true, description: "d", name: "My App" }),
     ).rejects.toThrow("Invalid --name 'My App'");
   });
 
   it("prompts only for values not given as flags", async () => {
     vi.mocked(input).mockResolvedValue("desc");
     vi.mocked(confirm).mockResolvedValue(true);
-    const a = await resolveBaseAnswers("./x", { name: "x", pm: "npm" }, "Me");
+    const a = await resolveBaseAnswers("./x", { name: "x", pm: "npm" });
     expect(input).toHaveBeenCalledTimes(1);
     expect(select).not.toHaveBeenCalled();
     expect(a).toMatchObject({ name: "x", description: "desc", pm: "npm", docker: true });
