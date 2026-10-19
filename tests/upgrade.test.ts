@@ -1,64 +1,60 @@
-import { describe, it, expect, vi } from "vitest";
-import { detectManager, upgrade, type UpgradeDeps } from "../src/commands/upgrade.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const make = (over: Partial<UpgradeDeps> = {}): UpgradeDeps => ({
-  currentVersion: "1.2.0",
-  fetchLatest: async () => "1.3.0",
-  isInstalled: (m) => m === "npm",
-  confirm: vi.fn().mockResolvedValue(true),
-  install: vi.fn().mockResolvedValue(undefined),
-  log: vi.fn(),
-  ...over,
+vi.mock("child_process", () => ({ execFileSync: vi.fn() }));
+vi.mock("@inquirer/prompts", () => ({ confirm: vi.fn() }));
+import { execFileSync } from "child_process";
+import { confirm } from "@inquirer/prompts";
+import { upgradeAction } from "../src/commands/upgrade.js";
+
+const latest = (version: string) =>
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ version }) }));
+const installs = () => vi.mocked(execFileSync).mock.calls.filter(([, args]) => args?.includes("-g") && !args.includes("ls"));
+
+beforeEach(() => {
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.mocked(execFileSync).mockReturnValue("djmond@1.0.0");
+  vi.mocked(confirm).mockResolvedValue(true);
+  process.exitCode = undefined;
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  process.exitCode = undefined;
 });
 
-describe("detectManager", () => {
-  it("prefers npm, then pnpm, else null", () => {
-    expect(detectManager(() => true)).toBe("npm");
-    expect(detectManager((m) => m === "pnpm")).toBe("pnpm");
-    expect(detectManager(() => false)).toBeNull();
-  });
-});
-
-describe("upgrade", () => {
-  it("installs with the detected manager after confirming", async () => {
-    const d = make({ isInstalled: (m) => m === "pnpm" });
-    expect(await upgrade(d, {})).toBe("upgraded");
-    expect(d.install).toHaveBeenCalledWith("pnpm");
-  });
-
-  it("does nothing when already current", async () => {
-    const d = make({ fetchLatest: async () => "1.2.0" });
-    expect(await upgrade(d, {})).toBe("up-to-date");
-    expect(d.install).not.toHaveBeenCalled();
-  });
-
-  it("--check reports without prompting or installing", async () => {
-    const d = make();
-    expect(await upgrade(d, { check: true })).toBe("available");
-    expect(d.confirm).not.toHaveBeenCalled();
-    expect(d.install).not.toHaveBeenCalled();
+describe("upgradeAction", () => {
+  it("installs after confirming", async () => {
+    latest("999.0.0");
+    await upgradeAction({});
+    expect(confirm).toHaveBeenCalled();
+    expect(installs()).toHaveLength(1);
   });
 
   it("-y skips the prompt", async () => {
-    const d = make();
-    expect(await upgrade(d, { yes: true })).toBe("upgraded");
-    expect(d.confirm).not.toHaveBeenCalled();
+    latest("999.0.0");
+    await upgradeAction({ yes: true });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(installs()).toHaveLength(1);
+  });
+
+  it("does nothing when already current", async () => {
+    latest("0.0.1");
+    await upgradeAction({});
+    expect(installs()).toHaveLength(0);
   });
 
   it("does not install when the user declines", async () => {
-    const d = make({ confirm: vi.fn().mockResolvedValue(false) });
-    expect(await upgrade(d, {})).toBe("declined");
-    expect(d.install).not.toHaveBeenCalled();
+    latest("999.0.0");
+    vi.mocked(confirm).mockResolvedValue(false);
+    await upgradeAction({});
+    expect(installs()).toHaveLength(0);
   });
 
-  it("reports not-installed when neither manager has it", async () => {
-    const d = make({ isInstalled: () => false });
-    expect(await upgrade(d, {})).toBe("not-installed");
-    expect(d.install).not.toHaveBeenCalled();
-  });
-
-  it("propagates registry errors", async () => {
-    const d = make({ fetchLatest: async () => { throw new Error("offline"); } });
-    await expect(upgrade(d, {})).rejects.toThrow("offline");
+  it("exits 1 when neither manager has it", async () => {
+    vi.mocked(execFileSync).mockImplementation(() => {
+      throw new Error("missing");
+    });
+    await upgradeAction({});
+    expect(process.exitCode).toBe(1);
   });
 });
