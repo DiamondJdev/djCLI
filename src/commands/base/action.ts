@@ -25,15 +25,24 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function prepareTarget(dir: string, force: boolean | undefined): TargetState {
-  if (force && fs.existsSync(dir)) {
-    console.log(`Removing existing directory: ${dir}`);
-    fs.rmSync(dir, { recursive: true });
-  }
+function inspectOrFail(dir: string): TargetState {
   try {
     return inspectTargetDir(dir);
   } catch (error) {
     return fail(messageOf(error));
+  }
+}
+
+// Empties the folder instead of removing it, so `--force .` works too.
+function clearDir(dir: string): void {
+  if (!fs.existsSync(dir)) return;
+  console.log(`Removing existing contents of: ${dir}`);
+  try {
+    for (const entry of fs.readdirSync(dir)) {
+      fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+    }
+  } catch (error) {
+    fail(`Could not clear '${dir}': ${messageOf(error)}`);
   }
 }
 
@@ -56,7 +65,8 @@ function writeIfMissing(file: string, content: string): void {
 }
 
 export async function baseInitAction(dir: string, flags: BaseFlags): Promise<void> {
-  const state = prepareTarget(dir, flags.force);
+  // Refuse a non-empty folder before asking anything; validate before deleting anything.
+  if (!flags.force) inspectOrFail(dir);
 
   let answers;
   try {
@@ -65,8 +75,16 @@ export async function baseInitAction(dir: string, flags: BaseFlags): Promise<voi
     return fail(messageOf(error));
   }
 
+  if (flags.force) clearDir(dir);
+  const state = inspectOrFail(dir);
+
+  // The test-runner install needs the network, so it runs last: if it fails,
+  // the project is otherwise complete and rerunning that one command finishes it.
+  const steps = packageManagerSteps(answers);
+  const install = steps[steps.length - 1];
+
   fs.mkdirSync(dir, { recursive: true });
-  for (const step of packageManagerSteps(answers)) runStep(step, dir);
+  for (const step of steps.slice(0, -1)) runStep(step, dir);
 
   const test = exampleTest(answers.pm);
   fs.mkdirSync(path.join(dir, path.dirname(test.path)), { recursive: true });
@@ -85,6 +103,8 @@ export async function baseInitAction(dir: string, flags: BaseFlags): Promise<voi
     if (!state.hasGitignore) fs.writeFileSync(path.join(dir, ".gitignore"), gitignoreFor(answers.pm));
     if (!state.hasGit) runStep({ cmd: "git", args: ["init"] }, dir);
   }
+
+  runStep(install, dir);
 
   console.log(chalk.green(`\nProject initialized successfully in ${dir}!`));
   console.log("\nNext steps:");

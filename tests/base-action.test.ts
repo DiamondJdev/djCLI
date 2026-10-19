@@ -48,14 +48,14 @@ afterEach(() => {
 });
 
 describe("baseInitAction", () => {
-  it("runs the package-manager steps in order, then git init, in the target folder", async () => {
+  it("runs init steps, then git init, then the network install last, in the target folder", async () => {
     await baseInitAction(target, flags);
     expect(calls()).toEqual([
       ["git", "config"],
       ["pnpm", "init"],
       ["pnpm", "pkg"],
-      ["pnpm", "add"],
       ["git", "init"],
+      ["pnpm", "add"],
     ]);
     expect(vi.mocked(execFileSync).mock.calls[1][2]).toMatchObject({ cwd: target });
   });
@@ -100,14 +100,40 @@ describe("baseInitAction", () => {
     expect(fs.existsSync(path.join(target, "AGENTS.md"))).toBe(true);
   });
 
-  it("on a failed install, names the command and leaves the folder", async () => {
+  it("on a failed install, names the command and leaves a complete project", async () => {
     vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
       if ((args as string[])[0] === "add") throw new Error("network");
       return Buffer.from("");
     });
     await expect(baseInitAction(target, flags)).rejects.toThrow("process.exit");
     expect(logs.join("\n")).toContain("Command failed: pnpm add -D vitest");
-    expect(fs.existsSync(target)).toBe(true);
+    for (const f of ["AGENTS.md", "CLAUDE.md", "tests/example.test.ts", ".gitignore"]) {
+      expect(fs.existsSync(path.join(target, f)), f).toBe(true);
+    }
+    expect(calls()).toContainEqual(["git", "init"]);
+  });
+
+  it("--force with a missing --description deletes nothing", async () => {
+    fs.mkdirSync(target);
+    fs.writeFileSync(path.join(target, "keep.txt"), "x");
+    await expect(
+      baseInitAction(target, { yes: true, force: true }),
+    ).rejects.toThrow("process.exit");
+    expect(fs.existsSync(path.join(target, "keep.txt"))).toBe(true);
+  });
+
+  it("--force on '.' empties the current folder and builds in it", async () => {
+    fs.mkdirSync(target);
+    fs.writeFileSync(path.join(target, "old.txt"), "x");
+    const cwd = process.cwd();
+    process.chdir(target);
+    try {
+      await baseInitAction(".", { ...flags, name: "demo", force: true });
+    } finally {
+      process.chdir(cwd);
+    }
+    expect(fs.existsSync(path.join(target, "old.txt"))).toBe(false);
+    expect(fs.existsSync(path.join(target, "AGENTS.md"))).toBe(true);
   });
 
   it("reports a missing package manager by name", async () => {

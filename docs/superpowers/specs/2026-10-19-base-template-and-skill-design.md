@@ -86,7 +86,7 @@ Fixed values, never asked:
    - pnpm: `pnpm init --init-type module`, then `pnpm pkg set` for name, description, author and license.
    - npm: `npm init -y --init-type module --init-author-name <author> --init-license MIT`, then `npm pkg set` for name and description.
    - uv: `uv init --lib --vcs none --name <name> --description <text> --author-from git`. `dj` runs `git init` itself so all three package managers behave the same.
-3. A test runner: Vitest for npm and pnpm, pytest for uv (as a dev dependency). `dj` writes one passing example test in `tests/` and sets the `test` script (`vitest run` for npm and pnpm). Running the test command right after init passes. Installing the test runner needs the network. If the install fails, `dj` stops with an error that names the failed command and leaves the folder in place, so the user can rerun the install by hand.
+3. A test runner: Vitest for npm and pnpm, pytest for uv (as a dev dependency). `dj` writes one passing example test in `tests/` and sets the `test` script (`vitest run` for npm and pnpm). Running the test command right after init passes. Installing the test runner needs the network, so it runs last, after every file is written and `git init` has run. If the install fails, `dj` stops with an error that names the failed command and leaves the folder in place, so the user can rerun the install by hand.
 4. `AGENTS.md`, generated from the answers (see below), and a `CLAUDE.md` whose only line is `@AGENTS.md`, so Claude Code reads the same file as Codex and the others. The `CLAUDE.md` file was my call.
 5. Unless `--no-git` is given, `git init` and a `.gitignore` suited to the package manager. No initial commit (my call).
 
