@@ -53,8 +53,6 @@ djCLI/
 ├── src/
 │   ├── index.ts                  # Entry point — registers commands, calls program.parse()
 │   └── commands/
-│       ├── del-branches.ts       # Git branch cleanup command
-│       ├── clean.ts              # Dependency folder cleanup
 │       ├── run.ts                # NPM script runner
 │       ├── init.ts               # Template initialization
 │       ├── skill.ts              # Agent skill install/uninstall
@@ -63,12 +61,8 @@ djCLI/
 ├── skills/
 │   └── dj-init/                  # Agent skill shipped with the package
 ├── tests/
-│   ├── del-branches.test.ts      # Pure function tests
-│   ├── clean.test.ts
 │   ├── run.test.ts
 │   ├── init.test.ts
-│   ├── del-branches-command.test.ts  # Command action handler tests
-│   ├── clean-command.test.ts
 │   ├── run-command.test.ts
 │   └── init-command.test.ts
 ├── dist/                         # Built output (gitignored)
@@ -83,36 +77,13 @@ djCLI/
 - `src/index.ts` is minimal — only registers commands and calls `program.parse()`
 - All command logic lives in `src/commands/`
 - Each command exports:
-  - Pure logic functions (e.g., `filterBranches`, `findMatchingScripts`) — unit tested directly
-  - An action handler function (e.g., `delBranchesAction`) — tested with mocked deps
+  - Pure logic functions (e.g., `findMatchingScripts`) — unit tested directly
+  - An action handler function (e.g., `runAction`) — tested with mocked deps
   - A `Command` instance for commander registration
 - Use `child_process.execSync` / `spawn` for shell execution
 - Always handle errors explicitly — no silent failures
 
 ## Implemented Commands
-
-### `dj del_branches`
-
-**Purpose:** Delete all merged git branches except protected branches
-
-**Features:**
-
-- `--dry-run` — Show what would be deleted without actually deleting
-- `--yes` | `-y` — Skip confirmation prompt
-- Interactive confirmation prompt by default
-- Proper error handling per branch with aggregated summary
-
-**Usage:**
-
-```bash
-dj del_branches                    # Delete merged branches (with confirmation)
-dj del_branches --dry-run          # Show what would be deleted
-dj del_branches --yes              # Skip confirmation prompt
-```
-
-**Protected Branches:** `main`, `master`, current branch (marked with `*`)
-
----
 
 ### `dj run <script> [--env <environment>]`
 
@@ -140,32 +111,6 @@ dj run build                       # If multiple "build:*" scripts exist, show p
 2. Exact match → run immediately; multiple prefix matches → interactive picker
 3. If `--env` passed, update/create `.env` with `NODE_ENV`
 4. Execute `npm run <script>` with inherited stdio
-
----
-
-### `dj clean`
-
-**Purpose:** Recursively remove heavy dependency and build folders
-
-**Features:**
-
-- `--dry-run` — Show what would be deleted without deleting
-- `--yes` — Skip confirmation prompt
-- `--depth <n>` — Limit directory traversal depth (default: unlimited)
-- Calculates and displays disk space to be freed
-- Human-readable size formatting (B, KB, MB, GB)
-- Always skips `.git` directories
-
-**Usage:**
-
-```bash
-dj clean                           # Interactive cleanup with confirmation
-dj clean --dry-run                 # Show what would be deleted
-dj clean --yes                     # Skip confirmation
-dj clean --depth 2                 # Limit to 2 levels deep
-```
-
-**Target Directories:** `node_modules`, `dist`, `build`, `.next`, `target`, `.turbo`, `out`
 
 ---
 
