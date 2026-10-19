@@ -6,8 +6,8 @@ import { templates } from '../src/commands/init.js'
 import { substituteVariables } from '../src/commands/init/template.js'
 
 describe('templates', () => {
-  it('registers nest, react, next and base', () => {
-    expect(Object.keys(templates).sort()).toEqual(['base', 'next', 'nest', 'react'].sort())
+  it('registers nest and base', () => {
+    expect(Object.keys(templates).sort()).toEqual(['base', 'nest'].sort())
   })
 
   it('every template has a description and prepare()', () => {

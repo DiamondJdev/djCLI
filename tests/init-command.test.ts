@@ -107,7 +107,7 @@ describe("initAction", () => {
     fs.mkdirSync("my-app");
     fs.writeFileSync("my-app/README.md", "mine");
     fakeClone({ "README.md": "theirs", "index.ts": "x" });
-    await initAction("react", "my-app", flags);
+    await initAction("nest", "my-app", flags);
     expect(fs.readFileSync("my-app/README.md", "utf-8")).toBe("mine");
     expect(fs.existsSync("my-app/index.ts")).toBe(true);
   });
@@ -134,7 +134,7 @@ describe("initAction", () => {
       if ((args as string[])[0] === "clone") throw new Error("clone failed");
       return "Me\n";
     });
-    await expect(initAction("react", "my-app", flags)).rejects.toThrow("process.exit");
+    await expect(initAction("nest", "my-app", flags)).rejects.toThrow("process.exit");
     expect(logs.join("\n")).toContain("Failed to clone template");
     expect(fs.readdirSync("my-app")).toEqual([]);
   });
