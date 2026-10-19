@@ -12,6 +12,7 @@ import {
   type Step,
 } from "./package-manager.js";
 import { renderAgentsMd, CLAUDE_MD } from "./agents-md.js";
+import { emptyDir } from "../../utils/empty-dir.js";
 
 const PROJECT_DIRS = ["docs", "src", "tests"];
 
@@ -33,14 +34,11 @@ function inspectOrFail(dir: string): TargetState {
   }
 }
 
-// Empties the folder instead of removing it, so `--force .` works too.
 function clearDir(dir: string): void {
   if (!fs.existsSync(dir)) return;
   console.log(`Removing existing contents of: ${dir}`);
   try {
-    for (const entry of fs.readdirSync(dir)) {
-      fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
-    }
+    emptyDir(dir);
   } catch (error) {
     fail(`Could not clear '${dir}': ${messageOf(error)}`);
   }

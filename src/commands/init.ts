@@ -6,6 +6,7 @@ import { input, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
 import { printAsciiArt } from "../utils/ascii.js";
 import { baseInitAction } from "./base/action.js";
+import { emptyDir } from "../utils/empty-dir.js";
 import type { BaseFlags } from "./base/answers.js";
 
 export interface TemplateVariable {
@@ -276,8 +277,18 @@ export async function initAction(
         return;
       }
     }
-    console.log(`Removing existing directory: ${targetDir}`);
-    fs.rmSync(targetDir, { recursive: true });
+    console.log(`Removing existing contents of: ${targetDir}`);
+    try {
+      emptyDir(targetDir);
+    } catch (error) {
+      console.log(
+        chalk.red(
+          `Could not clear '${targetDir}': ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+      process.exit(1);
+      return;
+    }
   }
 
   console.log(`Creating directory: ${targetDir}`);
@@ -294,7 +305,11 @@ export async function initAction(
     );
   } catch {
     console.log(chalk.red("Failed to clone template"));
-    fs.rmSync(targetDir, { recursive: true, force: true });
+    try {
+      emptyDir(targetDir);
+    } catch {
+      console.log(chalk.yellow(`Warning: could not clean up '${targetDir}'`));
+    }
     process.exit(1);
     return;
   }

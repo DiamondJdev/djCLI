@@ -108,6 +108,21 @@ describe("initAction", () => {
     spy.mockRestore();
   });
 
+  it("--force . empties the current folder and clones into it", async () => {
+    fs.writeFileSync(path.join(tmpDir, "old.txt"), "old");
+    vi.mocked(execFileSync).mockImplementation(() => {
+      fs.writeFileSync(path.join(tmpDir, "README.md"), "# new");
+      return Buffer.from("");
+    });
+    vi.mocked(input).mockResolvedValue("x");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await initAction("nest", ".", { force: true });
+    expect(fs.existsSync(tmpDir)).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "old.txt"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "README.md"))).toBe(true);
+    spy.mockRestore();
+  });
+
   it("clones template, removes .git, substitutes variables", async () => {
     const targetDir = path.join(tmpDir, "my-app");
     vi.mocked(execFileSync)
