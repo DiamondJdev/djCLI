@@ -4,7 +4,6 @@ import * as path from "path";
 import * as os from "os";
 
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
   execFileSync: vi.fn(),
 }));
 
@@ -14,165 +13,138 @@ vi.mock("@inquirer/prompts", () => ({
   select: vi.fn(),
 }));
 
-import { execSync, execFileSync } from "child_process";
-import { confirm, input } from "@inquirer/prompts";
+import { execFileSync } from "child_process";
 import { initAction } from "../src/commands/init.js";
 
 let tmpDir: string;
 let origCwd: string;
-let exitSpy: ReturnType<typeof vi.spyOn>;
+let logs: string[];
+
+const flags = { yes: true, description: "A test app" };
+
+/** Fake `git clone`: writes a template into the clone destination (the last arg). */
+function fakeClone(files: Record<string, string>) {
+  vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
+    const list = args as string[];
+    if (list[0] !== "clone") return "Me\n";
+    const dest = list[list.length - 1];
+    fs.mkdirSync(path.join(dest, ".git"), { recursive: true });
+    for (const [file, content] of Object.entries(files)) {
+      fs.writeFileSync(path.join(dest, file), content);
+    }
+    return Buffer.from("");
+  });
+}
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dj-test-"));
   origCwd = process.cwd();
   process.chdir(tmpDir);
-  exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
+  logs = [];
+  vi.spyOn(console, "log").mockImplementation((...args) => {
+    logs.push(args.join(" "));
+  });
+  vi.spyOn(process, "exit").mockImplementation(() => {
     throw new Error("process.exit");
   });
-  vi.mocked(execSync).mockReset();
   vi.mocked(execFileSync).mockReset();
-  vi.mocked(confirm).mockReset();
-  vi.mocked(input).mockReset();
 });
 
 afterEach(() => {
   process.chdir(origCwd);
   fs.rmSync(tmpDir, { recursive: true, force: true });
-  exitSpy.mockRestore();
   vi.restoreAllMocks();
 });
 
 describe("initAction", () => {
   it("exits with error for unknown template", async () => {
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(
-      initAction("angular", "./app", { force: false }),
-    ).rejects.toThrow("process.exit");
-    const output = spy.mock.calls.flat().join("\n");
-    expect(output).toContain("Unknown template 'angular'");
-    expect(output).toContain("nest");
-    spy.mockRestore();
+    await expect(initAction("angular", "./app", {})).rejects.toThrow("process.exit");
+    expect(logs.join("\n")).toContain("Unknown template 'angular'");
+    expect(logs.join("\n")).toContain("nest");
+  });
+
+  it("does not treat Object.prototype keys as templates", async () => {
+    await expect(initAction("constructor", "./app", {})).rejects.toThrow("process.exit");
+    expect(logs.join("\n")).toContain("Unknown template 'constructor'");
   });
 
   it("rejects base-only flags for cloned templates", async () => {
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     await expect(
-      initAction("nest", "./app", { force: false, pm: "uv" }),
+      initAction("nest", "./app", { ...flags, pm: "uv" }),
     ).rejects.toThrow("process.exit");
-    expect(spy.mock.calls.flat().join("\n")).toContain(
-      "only work with the base template",
-    );
-    expect(vi.mocked(execFileSync)).not.toHaveBeenCalled();
-    spy.mockRestore();
+    expect(logs.join("\n")).toContain("only work with the base template");
+    expect(fs.existsSync("./app")).toBe(false);
   });
 
-  it("dispatches base to the generated template without cloning", async () => {
-    const targetDir = path.join(tmpDir, "my-base");
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await initAction("base", targetDir, {
-      force: false,
-      yes: true,
-      description: "d",
+  it("rejects a target with parent directory references", async () => {
+    await expect(initAction("nest", "../app", flags)).rejects.toThrow("process.exit");
+    expect(logs.join("\n")).toContain("parent directory references");
+  });
+
+  it("clones, removes .git, substitutes answers and prints next steps", async () => {
+    fakeClone({ "README.md": "# {{PROJECT_NAME}} by {{AUTHOR}}: {{DESCRIPTION}}" });
+    await initAction("nest", "my-app", flags);
+    expect(fs.readFileSync("my-app/README.md", "utf-8")).toBe(
+      "# my-app by Me: A test app",
+    );
+    expect(fs.existsSync("my-app/.git")).toBe(false);
+    const out = logs.join("\n");
+    expect(out).toContain("Project initialized successfully");
+    expect(out).toContain("1. cd my-app");
+    expect(out).toContain("npm run dev");
+  });
+
+  it("refuses a non-empty folder without --force and changes nothing", async () => {
+    fs.mkdirSync("my-app");
+    fs.writeFileSync("my-app/old.txt", "old");
+    await expect(initAction("nest", "my-app", flags)).rejects.toThrow("process.exit");
+    expect(logs.join("\n")).toContain("is not empty: old.txt");
+    expect(fs.existsSync("my-app/old.txt")).toBe(true);
+    expect(vi.mocked(execFileSync)).not.toHaveBeenCalled();
+  });
+
+  it("keeps an existing README.md instead of overwriting it", async () => {
+    fs.mkdirSync("my-app");
+    fs.writeFileSync("my-app/README.md", "mine");
+    fakeClone({ "README.md": "theirs", "index.ts": "x" });
+    await initAction("react", "my-app", flags);
+    expect(fs.readFileSync("my-app/README.md", "utf-8")).toBe("mine");
+    expect(fs.existsSync("my-app/index.ts")).toBe(true);
+  });
+
+  it("--force . empties the current folder and clones into it", async () => {
+    fs.writeFileSync("old.txt", "old");
+    fakeClone({ "README.md": "# new" });
+    await initAction("nest", ".", { ...flags, force: true });
+    expect(fs.existsSync("old.txt")).toBe(false);
+    expect(fs.existsSync("README.md")).toBe(true);
+  });
+
+  it("--force with a missing --description deletes nothing", async () => {
+    fs.mkdirSync("my-app");
+    fs.writeFileSync("my-app/keep.txt", "x");
+    await expect(
+      initAction("nest", "my-app", { yes: true, force: true }),
+    ).rejects.toThrow("process.exit");
+    expect(fs.existsSync("my-app/keep.txt")).toBe(true);
+  });
+
+  it("a failed clone leaves the target untouched", async () => {
+    vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
+      if ((args as string[])[0] === "clone") throw new Error("clone failed");
+      return "Me\n";
     });
+    await expect(initAction("react", "my-app", flags)).rejects.toThrow("process.exit");
+    expect(logs.join("\n")).toContain("Failed to clone template");
+    expect(fs.readdirSync("my-app")).toEqual([]);
+  });
+
+  it("dispatches base without cloning", async () => {
+    await initAction("base", "my-base", flags);
     const clone = vi
       .mocked(execFileSync)
       .mock.calls.some(([, args]) => (args as string[])[0] === "clone");
     expect(clone).toBe(false);
-    expect(fs.existsSync(path.join(targetDir, "AGENTS.md"))).toBe(true);
-    spy.mockRestore();
-  });
-
-  it("prompts for overwrite when target dir exists and cancels", async () => {
-    const targetDir = path.join(tmpDir, "my-app");
-    fs.mkdirSync(targetDir);
-    vi.mocked(confirm).mockResolvedValue(false);
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await initAction("nest", targetDir, { force: false });
-    expect(spy.mock.calls.flat().join("\n")).toContain(
-      "Initialization cancelled",
-    );
-    spy.mockRestore();
-  });
-
-  it("--force skips overwrite prompt", async () => {
-    const targetDir = path.join(tmpDir, "my-app");
-    fs.mkdirSync(targetDir);
-    vi.mocked(execFileSync).mockImplementation(() => {
-      fs.mkdirSync(targetDir, { recursive: true });
-      return Buffer.from("");
-    });
-    vi.mocked(input).mockResolvedValue("my-app");
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await initAction("nest", targetDir, { force: true });
-    expect(vi.mocked(confirm)).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("--force . empties the current folder and clones into it", async () => {
-    fs.writeFileSync(path.join(tmpDir, "old.txt"), "old");
-    vi.mocked(execFileSync).mockImplementation(() => {
-      fs.writeFileSync(path.join(tmpDir, "README.md"), "# new");
-      return Buffer.from("");
-    });
-    vi.mocked(input).mockResolvedValue("x");
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await initAction("nest", ".", { force: true });
-    expect(fs.existsSync(tmpDir)).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "old.txt"))).toBe(false);
-    expect(fs.existsSync(path.join(tmpDir, "README.md"))).toBe(true);
-    spy.mockRestore();
-  });
-
-  it("clones template, removes .git, substitutes variables", async () => {
-    const targetDir = path.join(tmpDir, "my-app");
-    vi.mocked(execFileSync)
-      .mockImplementationOnce(() => {
-        fs.mkdirSync(path.join(targetDir, ".git"), { recursive: true });
-        fs.writeFileSync(
-          path.join(targetDir, "README.md"),
-          "# {{PROJECT_NAME}}",
-        );
-        return Buffer.from("");
-      })
-      .mockReturnValue(Buffer.from(""));
-    vi.mocked(input)
-      .mockResolvedValueOnce("my-app")
-      .mockResolvedValueOnce("TestAuthor")
-      .mockResolvedValueOnce("A test app");
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await initAction("nest", targetDir, { force: false });
-    expect(fs.readFileSync(path.join(targetDir, "README.md"), "utf-8")).toBe(
-      "# my-app",
-    );
-    expect(fs.existsSync(path.join(targetDir, ".git"))).toBe(false);
-    spy.mockRestore();
-  });
-
-  it("exits when git clone fails", async () => {
-    const targetDir = path.join(tmpDir, "my-app");
-    vi.mocked(execFileSync).mockImplementationOnce(() => {
-      throw new Error("clone failed");
-    });
-    vi.mocked(input).mockResolvedValue("my-app");
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(
-      initAction("react", targetDir, { force: false }),
-    ).rejects.toThrow("process.exit");
-    spy.mockRestore();
-  });
-
-  it("reports success and next steps after init", async () => {
-    const targetDir = path.join(tmpDir, "my-react-app");
-    vi.mocked(execFileSync).mockImplementation(() => {
-      fs.mkdirSync(targetDir, { recursive: true });
-      return Buffer.from("");
-    });
-    vi.mocked(input).mockResolvedValue("my-react-app");
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await initAction("react", targetDir, { force: false });
-    const output = spy.mock.calls.flat().join("\n");
-    expect(output).toContain("Project initialized successfully");
-    expect(output).toContain("Next steps");
-    spy.mockRestore();
+    expect(fs.existsSync("my-base/AGENTS.md")).toBe(true);
   });
 });

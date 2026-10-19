@@ -1,54 +1,20 @@
-import * as path from "path";
-import { execFileSync } from "child_process";
-import { input, select, confirm } from "@inquirer/prompts";
+import { select, confirm } from "@inquirer/prompts";
+import {
+  resolveCommonAnswers,
+  type CommonAnswers,
+  type InitOptions,
+} from "../init/answers.js";
 
 export type PackageManager = "npm" | "pnpm" | "uv";
 
 export const PACKAGE_MANAGERS: readonly PackageManager[] = ["npm", "pnpm", "uv"];
 
 const DEFAULT_PM: PackageManager = "pnpm";
-const FALLBACK_AUTHOR = "DiamondJdev";
-const MAX_NAME_LENGTH = 214;
 
-export interface BaseFlags {
-  name?: string;
-  description?: string;
-  pm?: string;
-  docker?: boolean;
-  yes?: boolean;
-  git?: boolean;
-  force?: boolean;
-}
-
-export interface BaseAnswers {
-  name: string;
-  description: string;
+export interface BaseAnswers extends CommonAnswers {
   pm: PackageManager;
   docker: boolean;
   git: boolean;
-  author: string;
-}
-
-export function toPackageName(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-export function isValidPackageName(name: string): boolean {
-  return name.length <= MAX_NAME_LENGTH && /^[a-z0-9][a-z0-9._-]*$/.test(name);
-}
-
-export function readGitAuthor(): string {
-  try {
-    const name = String(
-      execFileSync("git", ["config", "user.name"], { encoding: "utf-8" }) ?? "",
-    ).trim();
-    return name || FALLBACK_AUTHOR;
-  } catch {
-    return FALLBACK_AUTHOR;
-  }
 }
 
 function isPackageManager(value: string): value is PackageManager {
@@ -64,41 +30,7 @@ function checkPm(pm: string): PackageManager {
   return pm;
 }
 
-function checkName(name: string): string {
-  if (!isValidPackageName(name)) {
-    throw new Error(
-      `Invalid --name '${name}'. Use lowercase letters, digits, '.', '_' or '-'`,
-    );
-  }
-  return name;
-}
-
-async function resolveName(dir: string, flags: BaseFlags): Promise<string> {
-  if (flags.name !== undefined) return checkName(flags.name);
-  const fallback = toPackageName(path.basename(path.resolve(dir)));
-  if (flags.yes) return checkName(fallback);
-  const answer = await input({
-    message: "Project name",
-    default: fallback,
-    validate: (v) => isValidPackageName(v) || "Use lowercase letters, digits, '.', '_' or '-'",
-  });
-  return checkName(answer);
-}
-
-async function resolveDescription(flags: BaseFlags): Promise<string> {
-  if (flags.description !== undefined && flags.description.trim()) {
-    return flags.description.trim();
-  }
-  if (flags.yes) throw new Error("Missing --description (required with --yes)");
-  const answer = await input({
-    message: "One-line description",
-    validate: (v) => v.trim().length > 0 || "A description is required",
-  });
-  return answer.trim();
-}
-
-async function resolvePm(flags: BaseFlags): Promise<PackageManager> {
-  if (flags.pm !== undefined) return checkPm(flags.pm);
+async function resolvePm(flags: InitOptions): Promise<PackageManager> {
   if (flags.yes) return DEFAULT_PM;
   return select<PackageManager>({
     message: "Package manager",
@@ -107,7 +39,7 @@ async function resolvePm(flags: BaseFlags): Promise<PackageManager> {
   });
 }
 
-async function resolveDocker(flags: BaseFlags): Promise<boolean> {
+async function resolveDocker(flags: InitOptions): Promise<boolean> {
   if (flags.docker !== undefined) return flags.docker;
   if (flags.yes) return false;
   return confirm({ message: "Will this project run in Docker?", default: false });
@@ -115,18 +47,15 @@ async function resolveDocker(flags: BaseFlags): Promise<boolean> {
 
 export async function resolveBaseAnswers(
   dir: string,
-  flags: BaseFlags,
-  author: string,
+  flags: InitOptions,
 ): Promise<BaseAnswers> {
-  const pm = flags.pm !== undefined ? checkPm(flags.pm) : undefined;
-  const name = await resolveName(dir, flags);
-  const description = await resolveDescription(flags);
+  // Check --pm first so a typo fails before any prompt.
+  const flagPm = flags.pm !== undefined ? checkPm(flags.pm) : undefined;
+  const common = await resolveCommonAnswers(dir, flags);
   return {
-    name,
-    description,
-    pm: pm ?? (await resolvePm(flags)),
+    ...common,
+    pm: flagPm ?? (await resolvePm(flags)),
     docker: await resolveDocker(flags),
     git: flags.git !== false,
-    author,
   };
 }
