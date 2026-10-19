@@ -15,16 +15,16 @@ export const templates: Record<string, Template> = {
     "https://github.com/DiamondJdev/NestJSTemplate.git",
     ["Copy .env.example to .env and configure it", "npm install", "npm run dev"],
   ),
-  react: cloned(
-    "React frontend template with Vite",
-    "https://github.com/DiamondJdev/react-template.git",
-    ["npm install", "npm run dev"],
-  ),
-  next: cloned(
-    "Next.js full-stack template",
-    "https://github.com/DiamondJdev/next-template.git",
-    ["Copy .env.example to .env.local and configure it", "npm install", "npm run dev"],
-  ),
+  // react: cloned(
+  //   "React frontend template with Vite",
+  //   "https://github.com/DiamondJdev/react-template.git",
+  //   ["npm install", "npm run dev"],
+  // ),
+  // next: cloned(
+  //   "Next.js full-stack template",
+  //   "https://github.com/DiamondJdev/next-template.git",
+  //   ["Copy .env.example to .env.local and configure it", "npm install", "npm run dev"],
+  // ),
   base: baseTemplate,
 };
 
