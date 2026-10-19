@@ -56,6 +56,8 @@ djCLI/
 │       ├── run.ts                # NPM script runner
 │       ├── init.ts               # Template initialization
 │       ├── skill.ts              # Agent skill install/uninstall
+│       ├── doctor.ts             # CLI environment health checks
+│       ├── upgrade.ts            # Self-update via npm or pnpm
 │       ├── init/                 # Shared by every template (answers, target folder, cloned())
 │       └── base/                 # Generated `base` template
 ├── skills/
@@ -191,6 +193,25 @@ A template that isn't a git repo implements `Template` (`prepare` asks and retur
 ```bash
 dj skill install
 dj skill uninstall
+```
+
+### `dj doctor`
+
+Checks that your machine is ready to use `dj`. Prints ✔, ⚠ or ✖ per check with a one-line fix, and exits 1 only if a check fails.
+
+- **Fails (✖):** Node older than `engines`, npm or git missing.
+- **Warns (⚠):** `dj` behind the latest `djmond` on npm (or the registry is unreachable), a different `dj` on your PATH, pnpm or uv missing, git `user.name` or `user.email` unset, `dj-init` skill not installed.
+
+```bash
+dj doctor
+```
+
+### `dj upgrade [-y]`
+
+Updates `dj` to the latest `djmond` on npm. It looks for a global install in npm first, then pnpm, and upgrades with whichever has it. If neither does (for example `npx` or `npm link`), it exits 1. `-y` skips the confirmation. `dj` never checks for updates on its own.
+
+```bash
+dj upgrade -y
 ```
 
 ## Development
