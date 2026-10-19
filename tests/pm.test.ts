@@ -28,6 +28,13 @@ describe("detectPm", () => {
     expect(detectPm("/p")).toBe("uv");
   });
 
+  it("prefers npm markers over a stray pyproject.toml", () => {
+    hasFiles("package-lock.json", "pyproject.toml");
+    expect(detectPm("/p")).toBe("npm");
+    hasFiles("package.json", "pyproject.toml");
+    expect(detectPm("/p")).toBe("npm");
+  });
+
   it("falls back to npm", () => {
     hasFiles();
     expect(detectPm("/p")).toBe("npm");

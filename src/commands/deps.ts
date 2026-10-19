@@ -1,10 +1,10 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync, rmSync } from "fs";
 import { execFileSync } from "child_process";
 import { Command } from "commander";
 import chalk from "chalk";
 import type { PackageManager } from "./base/answers.js";
 import { pmCommands, type Step } from "./base/package-manager.js";
-import { detectPm, runStep } from "./pm.js";
+import { detectPm, pmStep, runStep } from "./pm.js";
 
 interface DepsPlan {
   files: string[];
@@ -56,6 +56,10 @@ export function depsAction(): void {
       return;
     }
 
+    // Only tracked files can be checked out on rollback; files the update creates get removed
+    const tracked = execFileSync("git", ["ls-files", "--", ...plan.files], { encoding: "utf-8" }).split("\n").filter(Boolean);
+    const created = plan.files.filter((f) => !existsSync(f));
+
     runStep(plan.outdated); // exits non-zero when anything is outdated
     if (plan.update.some((step) => runStep(step) !== 0)) {
       console.error(chalk.red("Update failed; check the output above"));
@@ -73,8 +77,9 @@ export function depsAction(): void {
       return;
     }
 
-    execFileSync("git", ["checkout", "--", ...plan.files]);
-    runStep(toStep(pmCommands(pm).install));
+    if (tracked.length > 0) execFileSync("git", ["checkout", "--", ...tracked]);
+    for (const f of created) rmSync(f, { force: true });
+    runStep(pmStep(pm, "i", []));
     console.error(chalk.red("Tests failed after updating, rolled back"));
     process.exitCode = 1;
   } catch (err) {

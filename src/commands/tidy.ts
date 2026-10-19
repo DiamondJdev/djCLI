@@ -20,6 +20,22 @@ export function pickBranches(input: {
   return [...new Set([...input.merged, ...input.gone])].filter((b) => !keep.has(b));
 }
 
+const trackState = (): Map<string, string> =>
+  new Map(
+    lines(git("for-each-ref", "--format=%(refname:short)\t%(upstream:track)", "refs/heads")).map(
+      (r) => r.split("\t") as [string, string],
+    ),
+  );
+
+// Gone branches safe to delete: fully pushed before this fetch pruned their upstream.
+// One already gone before the fetch can't be checked, so it's kept.
+export function pushedGone(before: Map<string, string>, after: Map<string, string>): string[] {
+  return [...after]
+    .filter(([b, track]) => track === "[gone]" && before.has(b))
+    .map(([b]) => b)
+    .filter((b) => before.get(b) !== "[gone]" && !before.get(b)!.includes("ahead"));
+}
+
 function defaultBase(): string {
   try {
     return git("symbolic-ref", "--short", "refs/remotes/origin/HEAD").trim();
@@ -30,6 +46,7 @@ function defaultBase(): string {
 
 export async function tidyAction(opts: { yes?: boolean }): Promise<void> {
   try {
+    const before = trackState();
     try {
       git("fetch", "--prune");
     } catch {
@@ -38,10 +55,13 @@ export async function tidyAction(opts: { yes?: boolean }): Promise<void> {
     git("worktree", "prune");
 
     const base = defaultBase();
-    const refs = lines(git("for-each-ref", "--format=%(refname:short)\t%(upstream:track)", "refs/heads"));
-    const gone = refs.filter((r) => r.endsWith("[gone]")).map((r) => r.split("\t")[0]);
+    const after = trackState();
+    const gone = pushedGone(before, after);
+    const kept = [...after].filter(([b, t]) => t === "[gone]" && !gone.includes(b)).map(([b]) => b);
+    if (kept.length > 0) console.log(chalk.dim(`Kept remote-deleted branches that may hold unpushed work: ${kept.join(", ")}`));
     const branches = pickBranches({
-      merged: lines(git("branch", "--merged", base, "--format=%(refname:short)")),
+      // after.has drops the "(HEAD detached at …)" line git branch prints
+      merged: lines(git("branch", "--merged", base, "--format=%(refname:short)")).filter((b) => after.has(b)),
       gone,
       checkedOut: lines(git("worktree", "list", "--porcelain"))
         .filter((l) => l.startsWith("branch refs/heads/"))

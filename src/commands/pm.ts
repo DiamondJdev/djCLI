@@ -12,8 +12,10 @@ type Verb = "i" | "rm" | "x";
 export function detectPm(dir = process.cwd()): PackageManager {
   const has = (file: string) => existsSync(path.join(dir, file));
   if (has("pnpm-lock.yaml")) return "pnpm";
-  if (has("uv.lock") || has("pyproject.toml")) return "uv";
-  return "npm";
+  if (has("package-lock.json")) return "npm";
+  if (has("uv.lock")) return "uv";
+  if (has("package.json")) return "npm";
+  return has("pyproject.toml") ? "uv" : "npm";
 }
 
 export function pmStep(pm: PackageManager, verb: Verb, args: string[], dev = false): Step {

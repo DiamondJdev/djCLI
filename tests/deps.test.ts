@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("fs", () => ({ existsSync: vi.fn(), readFileSync: vi.fn() }));
+vi.mock("fs", () => ({ existsSync: vi.fn(), readFileSync: vi.fn(), rmSync: vi.fn() }));
 vi.mock("child_process", () => ({ spawnSync: vi.fn(), execFileSync: vi.fn() }));
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, rmSync } from "fs";
 import { spawnSync, execFileSync } from "child_process";
 import { depsAction } from "../src/commands/deps.js";
 
@@ -15,9 +15,11 @@ const failOn = (command: string) =>
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith("pnpm-lock.yaml"));
+  vi.mocked(existsSync).mockImplementation((p) => /(pnpm-lock\.yaml|package\.json)$/.test(String(p)));
   vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ scripts: { test: "vitest run" } }));
-  vi.mocked(execFileSync).mockReset().mockReturnValue("");
+  vi.mocked(execFileSync)
+    .mockReset()
+    .mockImplementation((_cmd, args) => (args?.[0] === "ls-files" ? "package.json\npnpm-lock.yaml\n" : ""));
   vi.mocked(spawnSync).mockReset().mockReturnValue({ status: 0 } as never);
   process.exitCode = undefined;
 });
@@ -42,6 +44,16 @@ describe("depsAction", () => {
     expect(execFileSync).toHaveBeenCalledWith("git", ["checkout", "--", "package.json", "pnpm-lock.yaml"]);
     expect(ran().at(-1)).toBe("pnpm install");
     expect(process.exitCode).toBe(1);
+  });
+
+  it("rolls back only tracked files and removes a lockfile the update created", () => {
+    vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith("package.json"));
+    vi.mocked(execFileSync).mockImplementation((_cmd, args) => (args?.[0] === "ls-files" ? "package.json\n" : ""));
+    failOn("npm test");
+    depsAction();
+    expect(execFileSync).toHaveBeenCalledWith("git", ["checkout", "--", "package.json"]);
+    expect(rmSync).toHaveBeenCalledWith("package-lock.json", { force: true });
+    expect(ran().at(-1)).toBe("npm install");
   });
 
   it("keeps updates untested when there is no test script", () => {

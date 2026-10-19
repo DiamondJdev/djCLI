@@ -4,20 +4,35 @@ vi.mock("child_process", () => ({ execFileSync: vi.fn() }));
 vi.mock("@inquirer/prompts", () => ({ confirm: vi.fn() }));
 import { execFileSync } from "child_process";
 import { confirm } from "@inquirer/prompts";
-import { pickBranches, tidyAction } from "../src/commands/tidy.js";
+import { pickBranches, pushedGone, tidyAction } from "../src/commands/tidy.js";
 
 const git: Record<string, string> = {
   "symbolic-ref": "origin/main\n",
-  "for-each-ref": "main\t\nfeat/a\t\nfeat/squashed\t[gone]\nfeat/wip\t[ahead 2]\nfeat/other-tree\t[gone]\n",
+  "for-each-ref": "main\t\nfeat/a\t\nfeat/squashed\t[gone]\nfeat/wip\t[gone]\nfeat/other-tree\t[gone]\n",
   branch: "main\nfeat/a\n",
   worktree: "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo/.wt\nHEAD def\nbranch refs/heads/feat/other-tree\n",
 };
 const deleted = () =>
   vi.mocked(execFileSync).mock.calls.filter(([, a]) => a?.[0] === "branch" && a[1] === "-D").map(([, a]) => a![2]);
 
+// Tracking state before fetch --prune: feat/wip had unpushed commits
+const beforeFetch = "main\t\nfeat/a\t\nfeat/squashed\t\nfeat/wip\t[ahead 2]\nfeat/other-tree\t\n";
+const mockGit = (fetchFails = false) => {
+  let fetched = false;
+  vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
+    if (args![0] === "fetch") {
+      if (fetchFails) throw new Error("offline");
+      fetched = true;
+    }
+    if (args![0] === "for-each-ref" && !fetched) return beforeFetch;
+    return git[args![0]] ?? "";
+  });
+};
+
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
-  vi.mocked(execFileSync).mockReset().mockImplementation((_cmd, args) => git[args![0]] ?? "");
+  vi.mocked(execFileSync).mockReset();
+  mockGit();
   vi.mocked(confirm).mockReset().mockResolvedValue(true);
   process.exitCode = undefined;
 });
@@ -39,7 +54,23 @@ describe("pickBranches", () => {
   });
 });
 
+describe("pushedGone", () => {
+  it("keeps gone branches that were ahead, or already gone, before the fetch", () => {
+    const before = new Map([["feat/done", ""], ["feat/wip", "[ahead 2]"], ["feat/old", "[gone]"]]);
+    const after = new Map([["feat/done", "[gone]"], ["feat/wip", "[gone]"], ["feat/old", "[gone]"]]);
+    expect(pushedGone(before, after)).toEqual(["feat/done"]);
+  });
+});
+
 describe("tidyAction", () => {
+  it("never deletes the detached HEAD entry", async () => {
+    git.branch = "(HEAD detached at abc)\nmain\nfeat/a\n";
+    await tidyAction({ yes: true });
+    git.branch = "main\nfeat/a\n";
+    expect(deleted()).not.toContain("(HEAD detached at abc)");
+  });
+
+
   it("deletes merged and gone branches after confirming", async () => {
     await tidyAction({});
     expect(confirm).toHaveBeenCalled();
@@ -60,12 +91,9 @@ describe("tidyAction", () => {
   });
 
   it("still works offline", async () => {
-    vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
-      if (args![0] === "fetch") throw new Error("offline");
-      return git[args![0]] ?? "";
-    });
+    mockGit(true);
     await tidyAction({ yes: true });
-    expect(deleted()).toHaveLength(2);
+    expect(deleted()).toEqual(["feat/a"]);
   });
 
   it("exits 1 outside a git repo", async () => {
