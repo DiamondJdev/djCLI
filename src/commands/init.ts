@@ -4,6 +4,7 @@ import { execSync, execFileSync } from "child_process";
 import { Command } from "commander";
 import { input, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
+import { printAsciiArt } from "../utils/ascii.js";
 
 export interface TemplateVariable {
   name: string;
@@ -197,6 +198,9 @@ export async function initAction(
   targetDir: string,
   options: { force: boolean },
 ): Promise<void> {
+  printAsciiArt();
+  console.log();
+
   try {
     validateTargetDir(targetDir);
   } catch (error) {
@@ -314,7 +318,16 @@ export async function initAction(
 
 export const initCommand = new Command("init")
   .description("Initialize a new project from a template")
-  .argument("<template>", "Template name (nest, react, next)")
+  .argument("<template>", "Template name")
   .argument("<directory>", "Target directory")
   .option("--force", "Overwrite existing directory without confirmation")
+  .addHelpText(
+    "after",
+    `
+Templates:
+${Object.entries(templateRegistry)
+  .map(([name, config]) => `  ${name.padEnd(10)} ${config.description}`)
+  .join("\n")}
+`,
+  )
   .action(initAction);
