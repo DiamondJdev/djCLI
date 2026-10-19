@@ -15,7 +15,9 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "files": [
-    "dist"
+    "dist",
+    "ascii.txt",
+    "skills"
   ],
   "dependencies": {
     "@inquirer/prompts": "^7.4.0",

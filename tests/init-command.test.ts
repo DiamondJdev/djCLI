@@ -11,6 +11,7 @@ vi.mock("child_process", () => ({
 vi.mock("@inquirer/prompts", () => ({
   confirm: vi.fn(),
   input: vi.fn(),
+  select: vi.fn(),
 }));
 
 import { execSync, execFileSync } from "child_process";
@@ -50,6 +51,34 @@ describe("initAction", () => {
     const output = spy.mock.calls.flat().join("\n");
     expect(output).toContain("Unknown template 'angular'");
     expect(output).toContain("nest");
+    spy.mockRestore();
+  });
+
+  it("rejects base-only flags for cloned templates", async () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(
+      initAction("nest", "./app", { force: false, pm: "uv" }),
+    ).rejects.toThrow("process.exit");
+    expect(spy.mock.calls.flat().join("\n")).toContain(
+      "only work with the base template",
+    );
+    expect(vi.mocked(execFileSync)).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("dispatches base to the generated template without cloning", async () => {
+    const targetDir = path.join(tmpDir, "my-base");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await initAction("base", targetDir, {
+      force: false,
+      yes: true,
+      description: "d",
+    });
+    const clone = vi
+      .mocked(execFileSync)
+      .mock.calls.some(([, args]) => (args as string[])[0] === "clone");
+    expect(clone).toBe(false);
+    expect(fs.existsSync(path.join(targetDir, "AGENTS.md"))).toBe(true);
     spy.mockRestore();
   });
 

@@ -26,7 +26,7 @@ describe('templateRegistry', () => {
     for (const [name, config] of Object.entries(templateRegistry)) {
       expect(config.name, `${name}.name`).toBeTruthy()
       expect(config.description, `${name}.description`).toBeTruthy()
-      expect(config.gitUrl, `${name}.gitUrl`).toBeTruthy()
+      if (name !== 'base') expect(config.gitUrl, `${name}.gitUrl`).toBeTruthy()
       expect(Array.isArray(config.variables), `${name}.variables`).toBe(true)
     }
   })
