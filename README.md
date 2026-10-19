@@ -58,6 +58,9 @@ djCLI/
 │       ├── skill.ts              # Agent skill install/uninstall
 │       ├── doctor.ts             # CLI environment health checks
 │       ├── upgrade.ts            # Self-update via npm or pnpm
+│       ├── pm.ts                 # dj i / rm / x, package manager from the lockfile
+│       ├── deps.ts               # Update dependencies, roll back if tests fail
+│       ├── tidy.ts               # Delete merged branches, prune worktrees
 │       ├── init/                 # Shared by every template (answers, target folder, cloned())
 │       └── base/                 # Generated `base` template
 ├── skills/
@@ -212,6 +215,38 @@ Updates `dj` to the latest `djmond` on npm. It looks for a global install in npm
 
 ```bash
 dj upgrade -y
+```
+
+### `dj i [packages...] [-D]` / `dj rm <packages...>` / `dj x <bin> [args...]`
+
+Runs the project's own package manager, so you and your agents don't have to remember which one it uses. `pnpm-lock.yaml` means pnpm, `uv.lock` or `pyproject.toml` means uv, and anything else means npm. Only the current folder is checked.
+
+| Command | npm | pnpm | uv |
+|---|---|---|---|
+| `dj i` | `npm install` | `pnpm install` | `uv sync` |
+| `dj i zod` | `npm install zod` | `pnpm add zod` | `uv add zod` |
+| `dj i -D vitest` | `npm install -D vitest` | `pnpm add -D vitest` | `uv add --dev vitest` |
+| `dj rm zod` | `npm uninstall zod` | `pnpm remove zod` | `uv remove zod` |
+| `dj x eslint --fix` | `npx eslint --fix` | `pnpm dlx eslint --fix` | `uvx eslint --fix` |
+
+Everything after the binary name in `dj x` goes to the binary, flags included. The exit code is the package manager's.
+
+### `dj deps`
+
+Prints outdated dependencies, updates them within their version ranges, then runs the tests. If the tests fail, it restores the manifest and lockfile from git, reinstalls and exits 1. Major versions outside your ranges are listed but not installed.
+
+Before changing anything it checks that the manifest and lockfile have no uncommitted changes, so the rollback can't throw away your work. Without a `test` script the updates stay in place untested.
+
+```bash
+dj deps
+```
+
+### `dj tidy [-y]`
+
+Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to delete local branches that are either merged into the default branch or whose remote branch was deleted. The second group catches squash-merged PRs, which `git branch --merged` misses. It never deletes `main`, `master`, the default branch, or a branch checked out in any worktree. The list marks remote-deleted branches, because those can hold commits that were never merged. `-y` skips the confirmation.
+
+```bash
+dj tidy
 ```
 
 ## Development
