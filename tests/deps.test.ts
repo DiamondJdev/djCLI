@@ -56,6 +56,24 @@ describe("depsAction", () => {
     expect(ran().at(-1)).toBe("npm install");
   });
 
+  it("says so when the reinstall after rollback fails", () => {
+    vi.mocked(spawnSync).mockImplementation(
+      (cmd, args) => ({ status: ["pnpm test", "pnpm install"].includes([cmd, ...(args ?? [])].join(" ")) ? 1 : 0 }) as never,
+    );
+    depsAction();
+    expect(vi.mocked(console.error).mock.calls.flat().join(" ")).toMatch(/reinstall failed/i);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("treats npm init's placeholder test script as no test script", () => {
+    vi.mocked(readFileSync).mockReturnValue(
+      JSON.stringify({ scripts: { test: 'echo "Error: no test specified" && exit 1' } }),
+    );
+    depsAction();
+    expect(ran()).toEqual(["pnpm outdated", "pnpm update"]);
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it("keeps updates untested when there is no test script", () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ scripts: {} }));
     depsAction();

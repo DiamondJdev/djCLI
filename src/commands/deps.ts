@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, rmSync } from "fs";
+import { existsSync, rmSync } from "fs";
 import { execFileSync } from "child_process";
 import { Command } from "commander";
 import chalk from "chalk";
 import type { PackageManager } from "./base/answers.js";
 import { pmCommands, type Step } from "./base/package-manager.js";
 import { detectPm, pmStep, runStep } from "./pm.js";
+import { readPackageJSON } from "./run.js";
 
 interface DepsPlan {
   files: string[];
@@ -40,8 +41,8 @@ const toStep = (command: string): Step => {
 
 function hasTestScript(pm: PackageManager): boolean {
   if (pm === "uv") return true;
-  const pkg = JSON.parse(readFileSync("package.json", "utf-8")) as { scripts?: Record<string, string> };
-  return Boolean(pkg.scripts?.test);
+  const test = readPackageJSON().scripts?.test ?? "";
+  return test !== "" && !test.includes("no test specified"); // npm init's placeholder always fails
 }
 
 export function depsAction(): void {
@@ -79,8 +80,11 @@ export function depsAction(): void {
 
     if (tracked.length > 0) execFileSync("git", ["checkout", "--", ...tracked]);
     for (const f of created) rmSync(f, { force: true });
-    runStep(pmStep(pm, "i", []));
-    console.error(chalk.red("Tests failed after updating, rolled back"));
+    if (runStep(pmStep(pm, "i", [])) !== 0) {
+      console.error(chalk.red(`Tests failed; files rolled back but reinstall failed. Run ${pmCommands(pm).install}`));
+    } else {
+      console.error(chalk.red("Tests failed after updating, rolled back"));
+    }
     process.exitCode = 1;
   } catch (err) {
     console.error(chalk.red(`Error: ${(err as Error).message}`));

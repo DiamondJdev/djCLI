@@ -6,7 +6,7 @@ import { select } from "@inquirer/prompts";
 import { parse as parseEnv } from "dotenv";
 import chalk from "chalk";
 
-export function parsePackageJSON(): { scripts: Record<string, string> } {
+export function readPackageJSON(): { scripts?: Record<string, string> } {
   const filePath = path.join(process.cwd(), "package.json");
   let data: string;
   try {
@@ -15,7 +15,11 @@ export function parsePackageJSON(): { scripts: Record<string, string> } {
     throw new Error("package.json not found in current directory");
   }
 
-  const pkg = JSON.parse(data) as { scripts?: Record<string, string> };
+  return JSON.parse(data) as { scripts?: Record<string, string> };
+}
+
+export function parsePackageJSON(): { scripts: Record<string, string> } {
+  const pkg = readPackageJSON();
 
   if (!pkg.scripts || Object.keys(pkg.scripts).length === 0) {
     throw new Error("No scripts found in package.json");

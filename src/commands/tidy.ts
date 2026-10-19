@@ -40,7 +40,16 @@ function defaultBase(): string {
   try {
     return git("symbolic-ref", "--short", "refs/remotes/origin/HEAD").trim();
   } catch {
-    return "main";
+    const local = ["main", "master"].find((b) => {
+      try {
+        git("rev-parse", "--verify", "--quiet", `refs/heads/${b}`);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (local) return local;
+    throw new Error("Can't find the default branch. Run: git remote set-head origin -a");
   }
 }
 

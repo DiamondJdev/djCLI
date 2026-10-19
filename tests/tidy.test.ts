@@ -96,6 +96,18 @@ describe("tidyAction", () => {
     expect(deleted()).toEqual(["feat/a"]);
   });
 
+  it("falls back to a local master when origin/HEAD isn't set", async () => {
+    vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
+      if (args![0] === "symbolic-ref") throw new Error("not a symbolic ref");
+      if (args![0] === "rev-parse" && args!.at(-1) !== "refs/heads/master") throw new Error("unknown ref");
+      if (args![0] === "for-each-ref") return beforeFetch;
+      return git[args![0]] ?? "";
+    });
+    await tidyAction({ yes: true });
+    expect(execFileSync).toHaveBeenCalledWith("git", ["branch", "--merged", "master", "--format=%(refname:short)"], expect.anything());
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it("exits 1 outside a git repo", async () => {
     vi.mocked(execFileSync).mockImplementation(() => {
       throw new Error("not a git repository");
