@@ -206,12 +206,11 @@ Checks that your machine is ready to use `dj`. Prints ✔, ⚠ or ✖ per check 
 dj doctor
 ```
 
-### `dj upgrade [--check] [-y]`
+### `dj upgrade [-y]`
 
-Updates `dj` to the latest `djmond` on npm. It looks for a global install in npm first, then pnpm, and upgrades with whichever has it. If neither does (for example `npx` or `npm link`), it exits 1. `--check` only reports. `-y` skips the confirmation. `dj` never checks for updates on its own.
+Updates `dj` to the latest `djmond` on npm. It looks for a global install in npm first, then pnpm, and upgrades with whichever has it. If neither does (for example `npx` or `npm link`), it exits 1. `-y` skips the confirmation. `dj` never checks for updates on its own.
 
 ```bash
-dj upgrade --check
 dj upgrade -y
 ```
 
