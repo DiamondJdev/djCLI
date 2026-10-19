@@ -16,7 +16,8 @@
   },
   "files": [
     "dist",
-    "ascii.txt"
+    "ascii.txt",
+    "skills"
   ],
   "dependencies": {
     "@inquirer/prompts": "^7.4.0",
