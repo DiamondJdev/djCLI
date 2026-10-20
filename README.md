@@ -243,7 +243,7 @@ dj deps
 
 ### `dj tidy [-y]`
 
-Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to delete local branches that are either merged into the default branch or whose remote branch was deleted. The second group catches squash-merged PRs, which `git branch --merged` misses. If one of those branches is checked out in another worktree, it removes that worktree too, unless the worktree has uncommitted changes or is locked. Then the branch stays. It never deletes `main`, `master`, the default branch, the main worktree's branch, or the worktree you run it from. The list marks remote-deleted branches, because those can hold commits that were never merged. `-y` skips the confirmation.
+Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to delete local branches that are either merged into the default branch or whose remote branch was deleted. The second group catches squash-merged PRs, which `git branch --merged` misses. If one of those branches is checked out in another worktree, it removes that worktree too, unless the worktree has uncommitted changes, is locked, or contains another registered worktree. Then the branch stays. It never deletes `main`, `master`, the default branch, the main worktree's branch, or the worktree you run it from. It also works when run from a bare repository. The list marks remote-deleted branches, because those can hold commits that were never merged. `-y` skips the confirmation.
 
 ```bash
 dj tidy

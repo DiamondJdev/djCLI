@@ -91,9 +91,13 @@ export async function tidyAction(opts: { yes?: boolean }): Promise<void> {
     const kept = [...after].filter(([b, t]) => t === "[gone]" && !gone.includes(b)).map(([b]) => b);
     if (kept.length > 0) console.log(chalk.dim(`Kept remote-deleted branches that may hold unpushed work: ${kept.join(", ")}`));
     const trees = parseWorktrees(git("worktree", "list", "--porcelain"));
-    const here = git("rev-parse", "--show-toplevel").trim();
-    // Never remove the main worktree or the one dj is running in
-    const pinned = trees.filter((t, i) => i === 0 || t.path === here);
+    const here = git("rev-parse", "--is-bare-repository").trim() === "true"
+      ? undefined
+      : git("rev-parse", "--show-toplevel").trim();
+    // Keep the main worktree, the current one, and parents containing other worktrees.
+    const pinned = trees.filter((t, i) =>
+      i === 0 || t.path === here || trees.some((nested) => nested.path.startsWith(`${t.path}/`)),
+    );
     const treeOf = new Map(trees.filter((t) => !pinned.includes(t) && t.branch).map((t) => [t.branch!, t.path]));
     const branches = pickBranches({
       // after.has drops the "(HEAD detached at …)" line git branch prints

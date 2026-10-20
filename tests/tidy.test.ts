@@ -136,6 +136,44 @@ describe("tidyAction", () => {
     expect(deleted()).not.toContain("feat/other-tree");
   });
 
+  it.each(["current", "unmerged", "locked"])("keeps ancestors of a %s nested worktree", async (state) => {
+    const worktrees = git.worktree;
+    const here = git["rev-parse"];
+    const refs = git["for-each-ref"];
+    git["for-each-ref"] += "feat/nested\t\n";
+    git.worktree += `\nworktree /repo/.wt/.nested\nHEAD abc\nbranch refs/heads/feat/nested\n${state === "locked" ? "locked\n" : ""}`;
+    if (state === "current") git["rev-parse"] = "/repo/.wt/.nested\n";
+    try {
+      await tidyAction({ yes: true });
+      expect(removedTrees()).toEqual([]);
+      expect(deleted()).not.toContain("feat/other-tree");
+      expect(deleted()).toEqual(["feat/a", "feat/squashed"]);
+    } finally {
+      git.worktree = worktrees;
+      git["rev-parse"] = here;
+      git["for-each-ref"] = refs;
+    }
+  });
+
+  it("cleans linked worktrees when invoked from a bare repository", async () => {
+    const worktrees = git.worktree;
+    git.worktree = worktrees.replace("HEAD abc\nbranch refs/heads/main", "bare");
+    vi.mocked(execFileSync).mockImplementation((_cmd, args) => {
+      if (args![1] === "--is-bare-repository") return "true\n";
+      if (args![1] === "--show-toplevel") throw new Error("must be run in a work tree");
+      if (args![0] === "for-each-ref" && !vi.mocked(execFileSync).mock.calls.some(([, callArgs]) => callArgs?.[0] === "fetch")) return beforeFetch;
+      return git[args![0]] ?? "";
+    });
+    try {
+      await tidyAction({ yes: true });
+      expect(process.exitCode).toBeUndefined();
+      expect(removedTrees()).toEqual(["/repo/.wt"]);
+      expect(deleted()).toContain("feat/other-tree");
+    } finally {
+      git.worktree = worktrees;
+    }
+  });
+
   it("exits 1 outside a git repo", async () => {
     vi.mocked(execFileSync).mockImplementation(() => {
       throw new Error("not a git repository");
