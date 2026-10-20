@@ -20,6 +20,28 @@ export function pickBranches(input: {
   return [...new Set([...input.merged, ...input.gone])].filter((b) => !keep.has(b));
 }
 
+function parseWorktrees(porcelain: string): { path: string; branch?: string }[] {
+  return porcelain
+    .split("\n\n")
+    .map(lines)
+    .filter((ls) => ls.length > 0)
+    .map((ls) => ({
+      path: ls[0].slice("worktree ".length),
+      branch: ls.find((l) => l.startsWith("branch refs/heads/"))?.slice("branch refs/heads/".length),
+    }));
+}
+
+// git refuses to remove a worktree with uncommitted or untracked changes, or a locked one
+const removeWorktree = (path: string): boolean => {
+  try {
+    git("worktree", "remove", path);
+    return true;
+  } catch {
+    console.log(chalk.yellow(`Kept ${path}: it has uncommitted changes or is locked`));
+    return false;
+  }
+};
+
 const trackState = (): Map<string, string> =>
   new Map(
     lines(git("for-each-ref", "--format=%(refname:short)\t%(upstream:track)", "refs/heads")).map(
@@ -68,13 +90,16 @@ export async function tidyAction(opts: { yes?: boolean }): Promise<void> {
     const gone = pushedGone(before, after);
     const kept = [...after].filter(([b, t]) => t === "[gone]" && !gone.includes(b)).map(([b]) => b);
     if (kept.length > 0) console.log(chalk.dim(`Kept remote-deleted branches that may hold unpushed work: ${kept.join(", ")}`));
+    const trees = parseWorktrees(git("worktree", "list", "--porcelain"));
+    const here = git("rev-parse", "--show-toplevel").trim();
+    // Never remove the main worktree or the one dj is running in
+    const pinned = trees.filter((t, i) => i === 0 || t.path === here);
+    const treeOf = new Map(trees.filter((t) => !pinned.includes(t) && t.branch).map((t) => [t.branch!, t.path]));
     const branches = pickBranches({
       // after.has drops the "(HEAD detached at …)" line git branch prints
       merged: lines(git("branch", "--merged", base, "--format=%(refname:short)")).filter((b) => after.has(b)),
       gone,
-      checkedOut: lines(git("worktree", "list", "--porcelain"))
-        .filter((l) => l.startsWith("branch refs/heads/"))
-        .map((l) => l.slice("branch refs/heads/".length)),
+      checkedOut: pinned.flatMap((t) => (t.branch ? [t.branch] : [])),
       base,
     });
 
@@ -82,11 +107,16 @@ export async function tidyAction(opts: { yes?: boolean }): Promise<void> {
       console.log("Nothing to tidy");
       return;
     }
-    for (const b of branches) console.log(`  ${b}${gone.includes(b) ? chalk.dim(" (remote deleted)") : ""}`);
-    if (!opts.yes && !(await confirm({ message: `Delete ${branches.length} branch(es)?`, default: false }))) return;
+    const notes = (b: string) =>
+      [gone.includes(b) && "remote deleted", treeOf.has(b) && `worktree ${treeOf.get(b)}`].filter(Boolean).join(", ");
+    for (const b of branches) console.log(`  ${b}${notes(b) ? chalk.dim(` (${notes(b)})`) : ""}`);
+    const treeCount = branches.filter((b) => treeOf.has(b)).length;
+    const message = `Delete ${branches.length} branch(es)${treeCount ? ` and ${treeCount} worktree(s)` : ""}?`;
+    if (!opts.yes && !(await confirm({ message, default: false }))) return;
 
-    for (const b of branches) git("branch", "-D", b);
-    console.log(chalk.green(`Deleted ${branches.length} branch(es)`));
+    const deletable = branches.filter((b) => !treeOf.has(b) || removeWorktree(treeOf.get(b)!));
+    for (const b of deletable) git("branch", "-D", b);
+    console.log(chalk.green(`Deleted ${deletable.length} branch(es)`));
   } catch (err) {
     console.error(chalk.red(`Error: ${(err as Error).message}`));
     process.exitCode = 1;
@@ -94,6 +124,6 @@ export async function tidyAction(opts: { yes?: boolean }): Promise<void> {
 }
 
 export const tidyCommand = new Command("tidy")
-  .description("Delete merged and remote-deleted branches, prune stale worktrees")
+  .description("Delete merged and remote-deleted branches and their worktrees")
   .option("-y, --yes", "skip the confirmation prompt")
   .action(tidyAction);

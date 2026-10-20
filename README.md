@@ -60,7 +60,7 @@ djCLI/
 │       ├── upgrade.ts            # Self-update via npm or pnpm
 │       ├── pm.ts                 # dj i / rm / x, package manager from the lockfile
 │       ├── deps.ts               # Update dependencies, roll back if tests fail
-│       ├── tidy.ts               # Delete merged branches, prune worktrees
+│       ├── tidy.ts               # Delete merged branches and their worktrees
 │       ├── init/                 # Shared by every template (answers, target folder, cloned())
 │       └── base/                 # Generated `base` template
 ├── skills/
@@ -243,7 +243,7 @@ dj deps
 
 ### `dj tidy [-y]`
 
-Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to delete local branches that are either merged into the default branch or whose remote branch was deleted. The second group catches squash-merged PRs, which `git branch --merged` misses. It never deletes `main`, `master`, the default branch, or a branch checked out in any worktree. The list marks remote-deleted branches, because those can hold commits that were never merged. `-y` skips the confirmation.
+Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to delete local branches that are either merged into the default branch or whose remote branch was deleted. The second group catches squash-merged PRs, which `git branch --merged` misses. If one of those branches is checked out in another worktree, it removes that worktree too, unless the worktree has uncommitted changes or is locked. Then the branch stays. It never deletes `main`, `master`, the default branch, the main worktree's branch, or the worktree you run it from. The list marks remote-deleted branches, because those can hold commits that were never merged. `-y` skips the confirmation.
 
 ```bash
 dj tidy
