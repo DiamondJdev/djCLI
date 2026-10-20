@@ -7,6 +7,7 @@ import { upgradeCommand } from "./commands/upgrade.js";
 import { installCommand, removeCommand, execCommand } from "./commands/pm.js";
 import { depsCommand } from "./commands/deps.js";
 import { tidyCommand } from "./commands/tidy.js";
+import { typeCommand } from "./commands/type.js";
 import { printAsciiArt } from "./utils/ascii.js";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -39,6 +40,7 @@ program.addCommand(removeCommand);
 program.addCommand(execCommand);
 program.addCommand(depsCommand);
 program.addCommand(tidyCommand);
+program.addCommand(typeCommand);
 
 // If no command was provided, add delay before showing help
 if (hasNoArgs) {
