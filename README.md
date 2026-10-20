@@ -249,6 +249,14 @@ Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to 
 dj tidy
 ```
 
+### `dj type`
+
+A typing speed game. It shows a random code snippet, and you type it as fast as you can. Correct characters turn green and mistakes turn red. Backspace fixes a mistake, but the error still counts against your accuracy. Press Enter for a line break; the next line's indentation fills in on its own. The clock starts on your first key. When you finish, it prints your WPM (5 correct characters = 1 word), your accuracy and the time. Esc or Ctrl+C quits.
+
+```bash
+dj type
+```
+
 ## Development
 
 ### Build
