@@ -61,10 +61,12 @@ djCLI/
 │       ├── pm.ts                 # dj i / rm / x, package manager from the lockfile
 │       ├── deps.ts               # Update dependencies, roll back if tests fail
 │       ├── tidy.ts               # Delete merged branches, prune worktrees
+│       ├── deploy/               # dj deploy: per-repo SSH target, status/now/log pass-through
 │       ├── init/                 # Shared by every template (answers, target folder, cloned())
 │       └── base/                 # Generated `base` template
 ├── skills/
-│   └── dj-init/                  # Agent skill shipped with the package
+│   ├── dj-init/                  # Agent skill shipped with the package
+│   └── dj-deploy/                # Agent skill for dj deploy
 ├── tests/
 │   ├── run.test.ts
 │   ├── init.test.ts
@@ -248,6 +250,30 @@ Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to 
 ```bash
 dj tidy
 ```
+
+### `dj deploy <status|now|log|setup>`
+
+Runs the repo's deploy command on its server over SSH. `dj deploy status` becomes `ssh <host> <command> status`, and `now` and `log` work the same way. `dj` has no deploy logic of its own. The server side is a command such as `bt-deploy` from bt-assistant's deploy module.
+
+The first run in a repo asks for the SSH host (picked from `~/.ssh/config`, or typed in) and the remote command, which defaults to `bt-deploy`. It checks both over SSH and saves them in `~/.dj/config.json`, keyed by the repo's `origin` URL:
+
+```text
+$ dj deploy status
+? SSH host Other…
+? SSH host nixos
+? Remote deploy command bt-deploy
+Checking ssh nixos bt-deploy status ...
+Saved. Change it later with: dj deploy setup
+<the server's status block>
+```
+
+Later runs go straight to the server. Without a TTY, as when an agent runs it, `dj` never prompts. Pass the target as flags instead:
+
+```bash
+dj deploy setup --host nixos --command bt-deploy
+```
+
+`dj deploy now` gets a terminal (`ssh -t`) only when stdout is a TTY, so pipes and agents get plain output and the remote exit code.
 
 ## Development
 
