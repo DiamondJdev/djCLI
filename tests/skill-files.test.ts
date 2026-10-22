@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import { initCommand } from "../src/commands/init.js";
+import { deployCommand } from "../src/commands/deploy/index.js";
 
 describe("dj-init skill files", () => {
   it("SKILL.md has Agent Skills frontmatter", () => {
@@ -20,5 +21,22 @@ describe("dj-init skill files", () => {
   it("the package ships the skills folder", () => {
     const pkg = JSON.parse(fs.readFileSync("package.json", "utf-8"));
     expect(pkg.files).toContain("skills");
+  });
+});
+
+describe("dj-deploy skill file", () => {
+  const md = () => fs.readFileSync("skills/dj-deploy/SKILL.md", "utf-8");
+
+  it("SKILL.md has Agent Skills frontmatter", () => {
+    expect(md()).toMatch(/^---\nname: dj-deploy\ndescription: .+\n---\n/);
+  });
+
+  it("names every dj deploy subcommand", () => {
+    for (const c of deployCommand.commands) expect(md()).toContain(`\`dj deploy ${c.name()}\``);
+  });
+
+  it("names every setup option", () => {
+    const setup = deployCommand.commands.find((c) => c.name() === "setup")!;
+    for (const o of setup.options) expect(md()).toContain(o.long!);
   });
 });

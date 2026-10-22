@@ -60,11 +60,13 @@ djCLI/
 │       ├── upgrade.ts            # Self-update via npm or pnpm
 │       ├── pm.ts                 # dj i / rm / x, package manager from the lockfile
 │       ├── deps.ts               # Update dependencies, roll back if tests fail
-│       ├── tidy.ts               # Delete merged branches and their worktrees
+│       ├── tidy.ts               # Delete merged branches, prune worktrees
+│       ├── deploy/               # dj deploy: per-repo SSH target, status/now/log pass-through
 │       ├── init/                 # Shared by every template (answers, target folder, cloned())
 │       └── base/                 # Generated `base` template
 ├── skills/
-│   └── dj-init/                  # Agent skill shipped with the package
+│   ├── dj-init/                  # Agent skill shipped with the package
+│   └── dj-deploy/                # Agent skill for dj deploy
 ├── tests/
 │   ├── run.test.ts
 │   ├── init.test.ts
@@ -247,6 +249,40 @@ Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to 
 
 ```bash
 dj tidy
+```
+
+### `dj deploy [status|now|log|setup]`
+
+Runs the repo's deploy command on its server over SSH. `dj deploy status` becomes `ssh <host> <command> status`, and `now` and `log` work the same way. `dj` has no deploy logic of its own. The server side is a command such as `bt-deploy` from bt-assistant's deploy module.
+
+The first run in a repo asks for the SSH host (picked from `~/.ssh/config`, or typed in) and the remote command, which defaults to `bt-deploy`. It checks both over SSH and saves them in `~/.dj/config.json`, keyed by the repo's `origin` URL:
+
+```text
+$ dj deploy status
+? SSH host Other…
+? SSH host nixos
+? Remote deploy command bt-deploy
+Checking ssh nixos bt-deploy status ...
+Saved. Change it later with: dj deploy setup
+<the server's status block>
+```
+
+Later runs go straight to the server. Without a TTY, as when an agent runs it, `dj` never prompts. Pass the target as flags instead:
+
+```bash
+dj deploy setup --host nixos --command bt-deploy
+```
+
+Run `dj deploy` with no subcommand in a terminal to get a menu of `status`, `now`, `log` and `setup`. Pick one with the arrow keys and press Enter. If the repo has no target yet, setup runs first. Without a TTY, `dj deploy` prints its help.
+
+`dj deploy now` gets a terminal (`ssh -t`) only when stdin and stdout are TTYs. Otherwise, deploy commands disable SSH prompts and remote terminals (`ssh -T -o BatchMode=yes`), so pipes and agents get plain output and the remote exit code. Set up SSH keys and trust the server's host key before running without a terminal.
+
+### `dj type`
+
+A typing speed game. It shows a random code snippet, and you type it as fast as you can. Correct characters turn green and mistakes turn red. Backspace fixes a mistake, but the error still counts against your accuracy. Press Enter for a line break; the next line's indentation fills in on its own. The clock starts on your first key. When you finish, it prints your WPM (5 correct characters = 1 word), your accuracy and the time. Esc or Ctrl+C quits.
+
+```bash
+dj type
 ```
 
 ## Development
