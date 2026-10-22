@@ -10,7 +10,8 @@ type Sub = "status" | "now" | "log";
 
 export function sshArgs(t: DeployTarget, sub: Sub, tty: boolean): string[] {
   const args = [t.host, t.command, sub];
-  return sub === "now" && tty ? ["-t", ...args] : args;
+  if (!tty) return ["-T", "-o", "BatchMode=yes", ...args];
+  return sub === "now" ? ["-t", ...args] : args;
 }
 
 const interactive = (): boolean => Boolean(process.stdin.isTTY && process.stdout.isTTY);
@@ -33,7 +34,7 @@ const loadTarget = (): Promise<DeployTarget> => {
 };
 
 function runSub(target: DeployTarget, sub: Sub): void {
-  const r = spawnSync("ssh", sshArgs(target, sub, Boolean(process.stdout.isTTY)), { stdio: "inherit" });
+  const r = spawnSync("ssh", sshArgs(target, sub, interactive()), { stdio: "inherit" });
   if (r.error) throw r.error;
   process.exitCode = r.status ?? 1;
 }

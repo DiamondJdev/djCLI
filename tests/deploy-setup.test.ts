@@ -120,4 +120,13 @@ describe("setupTarget", () => {
     );
     expect(spawnSync).not.toHaveBeenCalled();
   });
+
+  it("rejects a command that SSH would interpret as an option", async () => {
+    const home = tmpHome();
+    await expect(setupTarget({ host: "nixos", command: "-V", interactive: false, home, key: KEY })).rejects.toThrow(
+      'Invalid command "-V"',
+    );
+    expect(spawnSync).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(home, ".dj", "config.json"))).toBe(false);
+  });
 });

@@ -275,7 +275,7 @@ dj deploy setup --host nixos --command bt-deploy
 
 Run `dj deploy` with no subcommand in a terminal to get a menu of `status`, `now`, `log` and `setup`. Pick one with the arrow keys and press Enter. If the repo has no target yet, setup runs first. Without a TTY, `dj deploy` prints its help.
 
-`dj deploy now` gets a terminal (`ssh -t`) only when stdout is a TTY, so pipes and agents get plain output and the remote exit code.
+`dj deploy now` gets a terminal (`ssh -t`) only when stdin and stdout are TTYs. Otherwise, deploy commands disable SSH prompts and remote terminals (`ssh -T -o BatchMode=yes`), so pipes and agents get plain output and the remote exit code. Set up SSH keys and trust the server's host key before running without a terminal.
 
 ### `dj type`
 

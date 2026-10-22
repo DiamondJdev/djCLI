@@ -45,8 +45,11 @@ afterEach(() => {
 describe("sshArgs", () => {
   it("adds -t only for now on a TTY", () => {
     expect(sshArgs(t, "now", true)).toEqual(["-t", "nixos", "bt-deploy", "now"]);
-    expect(sshArgs(t, "now", false)).toEqual(["nixos", "bt-deploy", "now"]);
     expect(sshArgs(t, "status", true)).toEqual(["nixos", "bt-deploy", "status"]);
+  });
+
+  it.each(["status", "now", "log"] as const)("disables SSH prompts and remote terminals for non-interactive %s", (sub) => {
+    expect(sshArgs(t, sub, false)).toEqual(["-T", "-o", "BatchMode=yes", "nixos", "bt-deploy", sub]);
   });
 });
 
@@ -58,7 +61,15 @@ describe("deployCommand", () => {
   it("runs the saved target and passes the exit code through", async () => {
     writeTarget(home, KEY, t);
     await run("status");
-    expect(spawnSync).toHaveBeenCalledWith("ssh", ["nixos", "bt-deploy", "status"], { stdio: "inherit" });
+    expect(spawnSync).toHaveBeenCalledWith("ssh", ["-T", "-o", "BatchMode=yes", "nixos", "bt-deploy", "status"], { stdio: "inherit" });
+    expect(process.exitCode).toBe(3);
+  });
+
+  it("does not request a terminal when stdin is piped but stdout is a TTY", async () => {
+    process.stdout.isTTY = true;
+    writeTarget(home, KEY, t);
+    await run("now");
+    expect(spawnSync).toHaveBeenCalledWith("ssh", ["-T", "-o", "BatchMode=yes", "nixos", "bt-deploy", "now"], { stdio: "inherit" });
     expect(process.exitCode).toBe(3);
   });
 

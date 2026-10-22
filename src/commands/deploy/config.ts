@@ -1,11 +1,12 @@
 import { execFileSync } from "child_process";
+import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 
 export type DeployTarget = { host: string; command: string };
 
 const HOST_RE = /^[A-Za-z0-9][A-Za-z0-9._@:-]*$/;
-const COMMAND_RE = /^[A-Za-z0-9_./-]+$/;
+const COMMAND_RE = /^[A-Za-z0-9_./][A-Za-z0-9_./-]*$/;
 
 export function repoKey(remoteUrl: string): string {
   return remoteUrl
@@ -60,6 +61,13 @@ export function readTarget(home: string, key: string): DeployTarget | undefined 
 export function writeTarget(home: string, key: string, t: DeployTarget): void {
   const config = readConfig(home);
   const next = { ...config, deploy: { ...deploySection(config), [key]: validateTarget(t) } };
-  fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
-  fs.writeFileSync(configPath(home), JSON.stringify(next, null, 2) + "\n");
+  const file = configPath(home);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(next, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    fs.renameSync(temporary, file);
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
 }
