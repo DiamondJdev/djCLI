@@ -6,7 +6,7 @@ import * as path from "path";
 vi.mock("child_process", () => ({ spawnSync: vi.fn(), execFileSync: vi.fn() }));
 vi.mock("@inquirer/prompts", () => ({ select: vi.fn(), input: vi.fn() }));
 import { spawnSync, execFileSync } from "child_process";
-import { input } from "@inquirer/prompts";
+import { input, select } from "@inquirer/prompts";
 import { deployCommand, sshArgs } from "../src/commands/deploy/index.js";
 import { writeTarget } from "../src/commands/deploy/config.js";
 
@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.mocked(execFileSync).mockReset().mockReturnValue("git@github.com:DiamondJdev/bt-assistant.git\n");
   vi.mocked(spawnSync).mockReset().mockReturnValue({ status: 3 } as ReturnType<typeof spawnSync>);
   vi.mocked(input).mockReset();
+  vi.mocked(select).mockReset();
   setTTY(false);
   process.exitCode = undefined;
 });
@@ -83,5 +84,41 @@ describe("deployCommand", () => {
     await run("setup", "--host", "nixos", "--command", "bt-deploy");
     expect(JSON.parse(fs.readFileSync(path.join(home, ".dj", "config.json"), "utf-8")).deploy[KEY]).toEqual(t);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it("bare deploy without a TTY prints help and does not prompt", async () => {
+    const help = vi.spyOn(deployCommand, "outputHelp").mockImplementation(() => {});
+    await run();
+    expect(help).toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("bare deploy on a TTY runs the picked command", async () => {
+    setTTY(true);
+    writeTarget(home, KEY, t);
+    vi.mocked(select).mockResolvedValueOnce("log");
+    await run();
+    expect(input).not.toHaveBeenCalled();
+    expect(spawnSync).toHaveBeenCalledWith("ssh", ["nixos", "bt-deploy", "log"], { stdio: "inherit" });
+  });
+
+  it("bare deploy on a TTY with no target runs setup, then the menu", async () => {
+    setTTY(true);
+    vi.mocked(spawnSync).mockReturnValueOnce({ status: 0, stderr: Buffer.from("") } as unknown as ReturnType<typeof spawnSync>);
+    vi.mocked(input).mockResolvedValueOnce("nixos").mockResolvedValueOnce("bt-deploy");
+    vi.mocked(select).mockResolvedValueOnce("status");
+    await run();
+    expect(input).toHaveBeenCalledTimes(2);
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(spawnSync).toHaveBeenLastCalledWith("ssh", ["nixos", "bt-deploy", "status"], { stdio: "inherit" });
+  });
+
+  it("Ctrl+C in the menu exits quietly", async () => {
+    setTTY(true);
+    writeTarget(home, KEY, t);
+    vi.mocked(select).mockRejectedValueOnce(Object.assign(new Error("closed"), { name: "ExitPromptError" }));
+    await run();
+    expect(console.error).not.toHaveBeenCalled();
+    expect(spawnSync).not.toHaveBeenCalled();
   });
 });

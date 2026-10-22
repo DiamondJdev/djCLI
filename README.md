@@ -251,7 +251,7 @@ Fetches with `--prune`, prunes worktrees whose folders are gone, then offers to 
 dj tidy
 ```
 
-### `dj deploy <status|now|log|setup>`
+### `dj deploy [status|now|log|setup]`
 
 Runs the repo's deploy command on its server over SSH. `dj deploy status` becomes `ssh <host> <command> status`, and `now` and `log` work the same way. `dj` has no deploy logic of its own. The server side is a command such as `bt-deploy` from bt-assistant's deploy module.
 
@@ -272,6 +272,8 @@ Later runs go straight to the server. Without a TTY, as when an agent runs it, `
 ```bash
 dj deploy setup --host nixos --command bt-deploy
 ```
+
+Run `dj deploy` with no subcommand in a terminal to get a menu of `status`, `now`, `log` and `setup`. Pick one with the arrow keys and press Enter. If the repo has no target yet, setup runs first. Without a TTY, `dj deploy` prints its help.
 
 `dj deploy now` gets a terminal (`ssh -t`) only when stdout is a TTY, so pipes and agents get plain output and the remote exit code.
 
