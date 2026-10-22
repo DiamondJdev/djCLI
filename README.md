@@ -275,6 +275,14 @@ dj deploy setup --host nixos --command bt-deploy
 
 `dj deploy now` gets a terminal (`ssh -t`) only when stdout is a TTY, so pipes and agents get plain output and the remote exit code.
 
+### `dj type`
+
+A typing speed game. It shows a random code snippet, and you type it as fast as you can. Correct characters turn green and mistakes turn red. Backspace fixes a mistake, but the error still counts against your accuracy. Press Enter for a line break; the next line's indentation fills in on its own. The clock starts on your first key. When you finish, it prints your WPM (5 correct characters = 1 word), your accuracy and the time. Esc or Ctrl+C quits.
+
+```bash
+dj type
+```
+
 ## Development
 
 ### Build
