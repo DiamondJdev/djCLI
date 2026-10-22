@@ -13,8 +13,8 @@ describe("compareVersions", () => {
 
 describe("fetchLatestVersion", () => {
   it("reads version from the registry response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ version: "1.4.0" }) }));
-    await expect(fetchLatestVersion()).resolves.toBe("1.4.0");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ version: "1.5.0" }) }));
+    await expect(fetchLatestVersion()).resolves.toBe("1.5.0");
   });
 
   it("throws on a non-ok response", async () => {
