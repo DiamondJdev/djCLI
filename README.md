@@ -8,7 +8,7 @@
 
 **Framework:** [commander](https://github.com/tj/commander.js)
 
-**Distribution:** npm package (`dj-cli`)
+**Distribution:** npm package (`djmond`)
 
 **Architecture:** Command-pattern CLI wrapper
 
@@ -18,10 +18,10 @@ djCLI is an opinionated CLI tool that simplifies multi-step developer workflows 
 
 ```bash
 # Global install
-npm install -g dj-cli
+npm install -g djmond
 
 # Or run without installing
-npx dj-cli <command>
+npx djmond <command>
 ```
 
 ## Core Philosophy
@@ -395,12 +395,3 @@ export const yourCommand = new Command('your-command')
 - [ ] `dj precommit` - Precheck workflow before git commiting
 - [ ] Shell completion (bash, zsh, fish)
 - [ ] Plugin system for user-defined commands
-
-## Changelog
-
-### v1.0.0
-
-- Built in TypeScript/npm
-- Four commands built: `del_branches`, `run`, `clean`, `init`
-- 88 tests, 92.4% coverage
-- Distributed as `dj-cli` npm package
